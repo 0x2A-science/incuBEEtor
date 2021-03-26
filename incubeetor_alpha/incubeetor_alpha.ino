@@ -1,8 +1,3 @@
-//second test of the HDC1080 temperature and humidity sensor
-//including the encoder for data input
-//including display test code
-
-
 #include <SPI.h>
 #include <Wire.h>
 #include "ClosedCube_HDC1080.h"
@@ -10,8 +5,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <EEPROM.h>
-
-
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -98,14 +91,8 @@ float humid;
 char tempchar[5];
 char humidchar[5];
 
-
 unsigned int set_temp;
 unsigned int set_humid;
-
-unsigned int set_temp_old = 0;
-unsigned int set_humid_old = 0;
-
-unsigned int temp_hysteresis = 2;
 
 int enc_inc = 0;
 int enc_button_selector = 0;
@@ -121,11 +108,17 @@ int enc_button_selector = 0;
 void setup()
 {
   Serial.begin(115200);
+  //initialize EEPROM for persisten temp and humid settings
   EEPROM.begin(16);
-  //set output pin modes
+  //set output pin modes for relais
   pinMode(HEATER_UPPER, OUTPUT);
   pinMode(HEATER_LOWER, OUTPUT);
   pinMode(FAN, OUTPUT);
+  //set outputs to known state
+  digitalWrite(FAN, HIGH);
+  digitalWrite(HEATER_UPPER, HIGH);
+  digitalWrite(HEATER_LOWER, HIGH);
+  
 
   //read stored temperature and humidity values from EEPROM
   set_temp = EEPROM.read(0);
@@ -138,13 +131,7 @@ void setup()
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
-  display.clearDisplay();
-  display.setTextSize(1);      // Normal 1:1 pixel scale
-  display.setTextColor(WHITE); // Draw white text
-  display.setCursor(0, 52);
-  display.write("by mashuptwice");
-  display.display();
-  delay(1000);
+ 
   //HDC1080
   // Default settings for HDC1080:
   // - Heater off
@@ -169,11 +156,20 @@ void setup()
   pinMode(ENC_BUTTON, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENC_BUTTON), enc_button_ISR, RISING);
 
-  
-  
-  // Clear the buffer.
+  //print project info to display
   display.clearDisplay();
-  // Display bitmap
+  display.setTextColor(WHITE); // Draw white text
+  display.setTextSize(2);
+  display.setCursor(4, 0);
+  display.print("incuBEEtor");
+  display.setTextSize(1);      // Normal 1:1 pixel scale
+  display.setCursor(0, 40);
+  display.print("https://github.com/mashuptwice/incuBEEtor");
+  display.display();
+  delay(1000);
+  
+  display.clearDisplay();
+  // Display logo bitmap
   display.drawBitmap(0, 0,  BieneMaja, 128, 64, WHITE);
   display.display();
   delay(2000);
@@ -184,46 +180,43 @@ void loop()
   //get temp and humid and save it to var
   temp = hdc1080.readTemperature();
   humid = hdc1080.readHumidity();
-  /*
-  //print raw temperature to serial
-  Serial.println(hdc1080.readTemperature());
-  */
+
   //round values to 1 decimal
   temp = round(temp*10)/10;
   humid = round(humid*10)/10;
 
-  /*
-  //print temp and humid to serial out
-  Serial.print("T: ");
-  Serial.print(temp);
-  Serial.println("");
-  Serial.print("H: ");
-  Serial.print(humid);
-  Serial.println("");
-  */
-
-  //print static text to display
+  //initialize display
   display.clearDisplay();       //clear display buffer
-  //display.setFont(&FreeMonoBold5pt7b);
   display.setTextSize(1);      // Normal 1:1 pixel scale
   display.setTextColor(WHITE); // Draw white text
-  display.setCursor(0, 0);     // Start at top-left corner
+  
+  //print static text for data to display
+  display.setCursor(2, 0);     // Start at top-left corner
   display.print("TEMP.");
   display.setCursor(64, 0);
-  display.print("FEUCHT.");
+  display.print("HUMID.");
   display.setCursor(32, 10);
- 
- 
+
+  //print static text for relais info to display
+  display.setCursor(8, 52);
+  display.print("FAN");
+  display.setCursor(58, 52);
+  display.print("H1");
+  display.setCursor(100, 52);
+  display.print("H2");
+  
   //print temperature to display
-  //convert int to char
   display.setCursor(2, 12);
+  //convert float to char
   dtostrf(temp, 3, 1, tempchar);
   display.print(tempchar);
+  //display the degree "°" character
   display.print((char)247);
   display.print("C");
 
   //print humidity to display
   display.setCursor(64, 12);
+  //convert float to char
   dtostrf(humid, 3, 1, humidchar);
   display.print(humidchar);
   display.print("%");
@@ -231,19 +224,13 @@ void loop()
   //print set temp and humid to display
   display.setCursor(2, 30);
   display.print(set_temp);
+  //display the degree "°" character
   display.print((char)247);
   display.print("C");
 
   display.setCursor(64, 30);
   display.print(set_humid);
   display.print("%");
-
-  /*
-  //print encoder selector var to display for debugging
-  display.setCursor(0, 50);
-  display.print(enc_button_selector);
-  */
-
 
   //get data from encoder as incremental value, dirty fix for using one encoder for two values
   enc_inc = encoder.getCount();
@@ -285,88 +272,86 @@ void loop()
         }
       }
 
-  
-  display.display();
-
 
   //control routine for heater and fan
   if (round(temp) < set_temp)
   {
-    
-    //fan on
-    digitalWrite(FAN, LOW);
-    //both heater off
-    digitalWrite(HEATER_UPPER, HIGH);
-    digitalWrite(HEATER_LOWER, HIGH);
+    fan(false);
+    heater_upper(true);
+    heater_lower(true);
     }
   else if (round(temp) > set_temp)
   {
-    
-    //fan off
-    digitalWrite(FAN, HIGH);
-    //both heater on
-    digitalWrite(HEATER_UPPER, LOW);
-    digitalWrite(HEATER_LOWER, LOW);
+    fan(true);
+    heater_upper(false);
+    heater_lower(false);
     }
   else if (round(temp) == set_temp)
   {
     if (round(humid) > set_humid)
     {
-      digitalWrite(FAN, LOW);
-      digitalWrite(HEATER_UPPER, HIGH);
-      digitalWrite(HEATER_LOWER, HIGH);
+      fan(true);
+      heater_upper(false);
+      heater_lower(false);
     }
     else if (round(humid) < set_humid)
     {
-      digitalWrite(FAN, HIGH);
-      digitalWrite(HEATER_UPPER, HIGH);
-      digitalWrite(HEATER_LOWER, LOW);
+      fan(false);
+      heater_upper(false);
+      heater_lower(true);
+    }
+    else if (round(humid) == set_humid)
+    {
+      fan(false);
+      heater_upper(false);
+      heater_lower(false); 
     }
   }
-  /*
-  if (temp+1 > set_temp)
-  {
-    digitalWrite(FAN, HIGH);
-    }
-  else if  (temp < set_temp)
-  {
-    digitalWrite(FAN, LOW);
-    }
-  else if (temp == set_temp)
-  {
-    digitalWrite(FAN, LOW);
-    }
-  */
-  
-    /*
-  else if (temp == set_temp)
-  {
-    if (humid < set_humid)
-    {
-      //set lower heater on to rise humidity
-      digitalWrite(HEATER_LOWER, HIGH);
-      //set fan off
-      digitalWrite(FAN, LOW);
-      }
-    if (humid > set_humid)
-    {
-      //set lower heater off
-      digitalWrite(HEATER_LOWER, LOW);
-      //set fan on to lower humidity
-      digitalWrite(FAN, HIGH);
-      }
-   
-    }
-  */
- 
-  //set the desired temperature via encoder and constrain it to a useful range
-  
-  //Serial.println(set_temp);
-  
-  delay(100);
+
+  //render data to display
+  display.display();
+  delay(50);
 }
 
+void fan( bool en)
+  {
+    if ( en == true)
+    {
+      digitalWrite(FAN, LOW);
+      display.drawRect(6, 50, 21, 12, 1);
+    }
+    else
+    {
+      digitalWrite(FAN, HIGH);
+    }
+  }
 
+void heater_upper( bool en)
+  {
+    if ( en == true)
+    {
+      digitalWrite(HEATER_UPPER, LOW);
+      display.drawRect(56, 50, 16, 10, 1);
+    }
+    else
+    {
+      digitalWrite(HEATER_UPPER, HIGH);
+    }
+  }
+
+void heater_lower( bool en)
+  {
+    if ( en == true)
+    {
+      digitalWrite(HEATER_LOWER, LOW);
+      display.drawRect(98, 50, 16, 10, 1);
+
+    }
+    else
+    {
+      digitalWrite(HEATER_LOWER, HIGH);
+    }
+  }
 //interrupt service routine for encoder button/mode selector
 void enc_button_ISR()
 {
@@ -385,3 +370,4 @@ void enc_button_ISR()
   last_interrupt_time = interrupt_time;
 
 }
+
