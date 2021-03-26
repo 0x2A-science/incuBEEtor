@@ -97,6 +97,10 @@ unsigned int set_humid;
 int enc_inc = 0;
 int enc_button_selector = 0;
 
+int c_case = 0;
+
+//set hysteresis to prevent uncontrolled switching
+int hysteresis = 1;
 
 #define HEATER_UPPER 12
 #define HEATER_LOWER 32
@@ -243,7 +247,7 @@ void loop()
       
       if (enc_inc != 0)
       { 
-        set_temp = constrain(set_temp + enc_inc / 2, 0, 60);
+        set_temp = constrain(set_temp + enc_inc / 2, 5, 60);
         
         enc_inc = 0;
         encoder.setCount(0);
@@ -261,7 +265,7 @@ void loop()
       //added dirty fix for some bouncing problem with the encoder, which only started to happen after final assembly...
       if (enc_inc != 0)
       {
-        set_humid = constrain(set_humid + enc_inc / 2, 0, 100);
+        set_humid = constrain(set_humid + enc_inc / 2, 5, 100);
         
         enc_inc = 0;
         encoder.setCount(0);
@@ -274,37 +278,61 @@ void loop()
 
 
   //control routine for heater and fan
-  if (round(temp) < set_temp)
+  switch (c_case)
   {
+  //too cold, heating
+  case 1:
     fan(false);
     heater_upper(true);
     heater_lower(true);
-    }
-  else if (round(temp) > set_temp)
-  {
+    break;
+  //too hot, cooling
+  case 2:
     fan(true);
     heater_upper(false);
     heater_lower(false);
+    break;
+  //temp nice, too dry
+  case 3:
+    fan(true);
+    heater_upper(false);
+    heater_lower(false);
+    break;
+  //temp nice, too humid
+  case 4:
+    fan(false);
+    heater_upper(false);
+    heater_lower(true);
+    break;
+  //all nice, all off
+  case 5:
+    fan(false);
+    heater_upper(false);
+    heater_lower(false);
+    break;
+  }
+  
+  if (round(temp) < set_temp)
+  {
+    c_case = 1;
+    }
+  else if (round(temp) > set_temp + hysteresis)
+  {
+    c_case = 2;
     }
   else if (round(temp) == set_temp)
   {
-    if (round(humid) > set_humid)
+    if (round(humid) > set_humid + hysteresis)
     {
-      fan(true);
-      heater_upper(false);
-      heater_lower(false);
+      c_case = 3;
     }
     else if (round(humid) < set_humid)
     {
-      fan(false);
-      heater_upper(false);
-      heater_lower(true);
+      c_case = 4;
     }
     else if (round(humid) == set_humid)
     {
-      fan(false);
-      heater_upper(false);
-      heater_lower(false); 
+      c_case = 5;
     }
   }
 
