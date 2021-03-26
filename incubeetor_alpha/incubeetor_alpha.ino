@@ -292,17 +292,18 @@ void loop()
     heater_upper(false);
     heater_lower(false);
     break;
-  //temp nice, too dry
-  case 3:
-    fan(false);
-    heater_upper(false);
-    heater_lower(true);
-    break;
   //temp nice, too humid
-  case 4:
+  case 3:
     fan(true);
     heater_upper(false);
     heater_lower(false);
+    break;
+  //temp nice, too dry
+  case 4:
+    fan(false); 
+    heater_upper(false);
+    heater_lower(true);
+   
     break;
   //all nice, all off
   case 5:
