@@ -3,6 +3,7 @@ ESP32 based temperature and humidity control for a bee queen incubator
 
 ## parts list
 -ESP32 Dev Board
+
 -12V power supply
 -4 channel relais module
 -12V silent fan
