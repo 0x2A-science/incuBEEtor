@@ -100,7 +100,7 @@ int enc_button_selector = 0;
 int c_case = 0;
 
 //set hysteresis to prevent uncontrolled switching
-int hysteresis = 1;
+int hysteresis = 2;
 
 #define HEATER_UPPER 12
 #define HEATER_LOWER 32
@@ -112,12 +112,18 @@ int hysteresis = 1;
 void setup()
 {
   Serial.begin(115200);
+  Serial.println("test");
   //initialize EEPROM for persisten temp and humid settings
   EEPROM.begin(16);
   //set output pin modes for relais
   pinMode(HEATER_UPPER, OUTPUT);
   pinMode(HEATER_LOWER, OUTPUT);
   pinMode(FAN, OUTPUT);
+
+  pinMode(ENC_BUTTON, INPUT_PULLUP);
+  pinMode(ENC_DT, INPUT_PULLUP);
+  pinMode(ENC_CLK, INPUT_PULLUP);
+  
   //set outputs to known state
   digitalWrite(FAN, HIGH);
   digitalWrite(HEATER_UPPER, HIGH);
@@ -157,7 +163,6 @@ void setup()
   Serial.println("Encoder Start = " + String((int32_t)encoder.getCount()));
 
   //ENCODER BUTTON INTERRUPT
-  pinMode(ENC_BUTTON, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENC_BUTTON), enc_button_ISR, RISING);
 
   //print project info to display
@@ -313,7 +318,7 @@ void loop()
     break;
   }
   
-  if (round(temp) < set_temp)
+  if (round(temp) < set_temp - hysteresis)
   {
     c_case = 1;
     }
@@ -399,4 +404,3 @@ void enc_button_ISR()
   last_interrupt_time = interrupt_time;
 
 }
-
