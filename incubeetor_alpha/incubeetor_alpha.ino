@@ -317,18 +317,26 @@ void loop()
     heater_lower(false);
     break;
   }
+  Serial.println(round(temp));
+
+  Serial.println(round(temp) - hysteresis);
+
+  Serial.println(set_temp);
+
   
-  if (round(temp) < set_temp - hysteresis)
+  if (round(temp) + hysteresis <= set_temp)
   {
     c_case = 1;
+    Serial.println("too cold");
     }
-  else if (round(temp) > set_temp + hysteresis)
+  else if (round(temp) >= set_temp + hysteresis)
   {
     c_case = 2;
+    Serial.println("too hot");
     }
   else if (round(temp) == set_temp)
   {
-    if (round(humid) > set_humid + hysteresis)
+    if (round(humid) > set_humid)
     {
       c_case = 3;
     }
